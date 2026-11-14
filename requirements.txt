@@ -1,0 +1,2 @@
+# Chỉ cần khi chạy trên máy chủ Internet. Chạy trên máy cá nhân (python3 server.py) không cần cài gì.
+gunicorn>=23,<28

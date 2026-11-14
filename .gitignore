@@ -1,0 +1,10 @@
+# Dữ liệu thật (CSDL, tài khoản ban đầu, bản sao lưu) không bao giờ đưa lên kho mã
+data/
+data_*/
+*.db
+*.db-wal
+*.db-shm
+TAI_KHOAN_BAN_DAU.txt
+__pycache__/
+*.pyc
+.DS_Store

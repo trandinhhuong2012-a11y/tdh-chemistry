@@ -1,0 +1,29 @@
+# Bản thiết kế (Blueprint) tạo dịch vụ TĐH Chemistry trên Render.
+# Dùng: Render Dashboard → New → Blueprint → chọn kho mã này → Apply.
+# Chi phí: gói 0.5 CPU / 512 MB (7 USD/tháng) + đĩa 1 GB (0,25 USD/tháng).
+services:
+  - type: web
+    name: tdh-chemistry
+    runtime: python
+    region: singapore            # gần Việt Nam nhất; không đổi được sau khi tạo
+    plan: 0.5c-512mb
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:application --preload --workers 2 --threads 8 --timeout 60 --bind 0.0.0.0:$PORT
+    healthCheckPath: /healthz
+    disk:                        # nơi lưu cơ sở dữ liệu; giữ nguyên qua các lần cập nhật mã nguồn
+      name: tdh-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: TDH_DATA
+        value: /var/data
+      - key: TDH_SECURE_COOKIE   # cookie chỉ gửi qua HTTPS + bật HSTS
+        value: "1"
+      - key: TDH_TRUST_PROXY     # lấy IP người dùng từ proxy của Render (để giới hạn đăng nhập sai)
+        value: "1"
+      - key: TDH_NO_DEMO         # không tạo lớp/học sinh/đề minh hoạ trên máy chủ thật
+        value: "1"
+      - key: TZ
+        value: Asia/Ho_Chi_Minh
+      - key: TDH_ADMIN_PASSWORD  # Render tự sinh; xem ở mục Environment để đăng nhập lần đầu (tài khoản giaovien)
+        generateValue: true
