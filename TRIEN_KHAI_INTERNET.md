@@ -21,17 +21,19 @@ Máy chủ trên Internet có cơ sở dữ liệu **riêng**, bắt đầu tr�
 ## Việc thường làm
 
 - **Sao lưu:** đăng nhập tài khoản quản trị → **Nhật kí và sao lưu** → *Tải bản sao lưu (.db)*. Nên tải mỗi tuần và trước mỗi lần cập nhật.
-- **Cập nhật website** (khi mã nguồn thay đổi): trong thư mục dự án chạy lần lượt
+- **Cập nhật website** (khi mã nguồn thay đổi): commit rồi chạy trong thư mục dự án
 
   ```bash
   git push
   ```
 
+  Render tự dựng lại sau mỗi lần đẩy mã (đã thử ngày 14/11/2026: khoảng 40 giây). Nếu Render không tự dựng, chạy lệnh dưới hoặc vào Render → dịch vụ → **Manual Deploy → Deploy latest commit**:
+
   ```bash
-  ./.tools/render_cli/cli_v2.36.0 deploys create srv-dbs8go8ae00c73csl2l0 --confirm
+  ./.tools/render_cli/cli_v2.36.0 deploys create srv-dbs8go8ae00c73csl2l0 --wait --confirm
   ```
 
-  hoặc vào Render → dịch vụ → **Manual Deploy → Deploy latest commit**. Website gián đoạn vài giây khi đổi phiên bản; dữ liệu trên đĩa được giữ nguyên. Tránh cập nhật lúc học sinh đang làm bài.
+  Website gián đoạn vài giây khi đổi phiên bản; dữ liệu trên đĩa được giữ nguyên (đã kiểm chứng qua một lần dựng lại). Tránh cập nhật lúc học sinh đang làm bài.
 - **Xem nhật kí máy chủ:** Render → dịch vụ → **Logs**.
 - **Tên miền riêng:** Render → dịch vụ → **Settings → Custom Domains**, rồi trỏ DNS theo hướng dẫn.
 - **Dừng hẳn và ngừng tính phí:** Render → dịch vụ → **Settings → Delete Web Service**. Thao tác này xoá cả đĩa dữ liệu — tải bản sao lưu trước.
