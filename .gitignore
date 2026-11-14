@@ -8,3 +8,4 @@ TAI_KHOAN_BAN_DAU.txt
 __pycache__/
 *.pyc
 .DS_Store
+.tools/
