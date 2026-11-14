@@ -1701,7 +1701,7 @@ def init_db(demo=True):
         with open(path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(created) + '\n')
         os.chmod(path, 0o600)
-        print('Đã tạo cơ sở dữ liệu mới. Tài khoản ban đầu ghi trong tệp:\n  ' + path)
+        print('Đã tạo cơ sở dữ liệu mới. Tài khoản ban đầu ghi trong tệp:\n  ' + path, flush=True)
     con.close()
 
 
