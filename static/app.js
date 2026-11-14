@@ -366,6 +366,35 @@ route('/login', null, async () => {
   };
 });
 
+/* ── Đặt mật khẩu lần đầu bằng liên kết dùng một lần (in trong nhật kí máy chủ) ── */
+route('/setup/:token', null, async token => {
+  $('#app').innerHTML = `<div class="auth"><div class="card">
+    <img class="logo" src="/img/logo_tdh.png" alt="Logo TĐH"><h1>Đặt mật khẩu lần đầu</h1>
+    <p class="sub">Tài khoản quản trị <b>giaovien</b> · TĐH Chemistry</p>
+    <form id="setup-form" novalidate>
+      <label class="f"><span>Mật khẩu mới</span><input type="password" name="new" autocomplete="new-password" required minlength="8">
+        <small>Ít nhất 8 kí tự. Thầy/cô tự đặt và ghi nhớ; không ai khác biết mật khẩu này.</small></label>
+      <label class="f"><span>Nhập lại mật khẩu mới</span><input type="password" name="again" autocomplete="new-password" required></label>
+      <p class="form-err" hidden></p>
+      <button class="btn primary lg" style="width:100%" type="submit">Lưu mật khẩu và vào trang quản lí</button></form>
+    <p class="muted small center mt">Liên kết này chỉ dùng được một lần.</p></div></div>`;
+  const f = $('#setup-form');
+  f.elements.new.focus();
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const errBox = $('.form-err', f), btn = $('button', f), show = m => { errBox.textContent = m; errBox.hidden = false; };
+    errBox.hidden = true;
+    if (f.elements.new.value !== f.elements.again.value) return show('Hai lần nhập mật khẩu chưa giống nhau.');
+    btn.disabled = true;
+    try {
+      App.user = await api('POST', '/api/setup', { token, new: f.elements.new.value });
+      history.replaceState(null, '', '#/');              // bỏ mã dùng một lần khỏi thanh địa chỉ
+      toast('Đã đặt mật khẩu. Lần sau đăng nhập bằng mã giaovien và mật khẩu này.', 'ok');
+      go(home());
+    } catch (err) { show(err.message); } finally { btn.disabled = false; }
+  };
+});
+
 /* ── Tài khoản: đổi mật khẩu ── */
 route('/account', ['admin', 'teacher', 'student'], async () => {
   const u = App.user, forced = u.must_change;

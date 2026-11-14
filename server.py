@@ -108,6 +108,9 @@ CREATE TABLE IF NOT EXISTS news(
 CREATE TABLE IF NOT EXISTS audit(
   id INTEGER PRIMARY KEY, actor_id INTEGER, action TEXT NOT NULL, target TEXT NOT NULL DEFAULT '',
   meta TEXT NOT NULL DEFAULT '{}', at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS setup_tokens(
+  token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at INTEGER NOT NULL);
 """
 
 
@@ -326,6 +329,34 @@ def change_password(rq):
         rq.con.execute('DELETE FROM sessions WHERE user_id=? AND token<>?', (u['id'], rq.token_hash))
         audit(rq, 'password.change')
     return {'ok': True}
+
+
+@route('POST', '/api/setup', None, use_tx=False)
+def first_setup(rq):
+    """Đặt mật khẩu lần đầu cho tài khoản quản trị bằng liên kết dùng một lần (in ra nhật kí khi khởi động)."""
+    token, new = str(rq.body.get('token') or ''), str(rq.body.get('new') or '')
+    con, t = rq.con, now()
+    tries = con.execute("SELECT COUNT(*) FROM login_failures WHERE login_id='(setup)' AND ip=? AND at>?",
+                        (rq.ip, t - 600)).fetchone()[0]
+    if tries >= 10:
+        raise ApiError(429, 'Thử quá nhiều lần. Vui lòng thử lại sau khoảng 10 phút.')
+    row = con.execute('SELECT s.user_id, u.login_id, u.must_change FROM setup_tokens s JOIN users u ON u.id=s.user_id '
+                      "WHERE s.token=? AND s.expires_at>? AND u.status='active'", (sha(token), t)).fetchone()
+    if not row or not row['must_change']:
+        con.execute("INSERT INTO login_failures VALUES('(setup)',?,?)", (rq.ip, t))
+        raise ApiError(400, 'Liên kết đặt mật khẩu không hợp lệ, đã dùng rồi hoặc đã hết hạn.')
+    if not (8 <= len(new) <= 128) or new.lower() == row['login_id']:
+        raise ApiError(400, 'Mật khẩu mới cần từ 8 kí tự trở lên và khác mã đăng nhập.')
+    h, sess = hash_pw(new), secrets.token_urlsafe(32)
+    with tx(con):
+        con.execute('UPDATE users SET pw=?, must_change=0 WHERE id=?', (h, row['user_id']))
+        con.execute('DELETE FROM setup_tokens WHERE user_id=?', (row['user_id'],))
+        con.execute('DELETE FROM sessions WHERE user_id=?', (row['user_id'],))
+        con.execute('INSERT INTO sessions VALUES(?,?,?)', (sha(sess), row['user_id'], t + SESSION_TTL))
+        con.execute("INSERT INTO audit(actor_id, action, target, meta, at) VALUES(?, 'password.setup', '', '{}', ?)",
+                    (row['user_id'], t))
+    rq.set_cookie = sess
+    return user_public(con.execute('SELECT * FROM users WHERE id=?', (row['user_id'],)).fetchone())
 
 
 @route('GET', '/api/public/news', None)
@@ -1714,6 +1745,33 @@ def configure(data_dir=None, demo=None):
     init_db(demo=(os.environ.get('TDH_NO_DEMO') != '1') if demo is None else demo)
 
 
+SETUP_TTL = 12 * 3600
+
+
+def setup_link(base=''):
+    """Nếu tài khoản quản trị chưa từng đặt mật khẩu riêng, tạo liên kết dùng một lần để đặt mật khẩu lần đầu.
+    Liên kết chỉ in ra nhật kí máy chủ; mã nằm sau dấu # nên không bị gửi lên máy chủ khi mở trang."""
+    con = db()
+    try:
+        u = con.execute("SELECT id FROM users WHERE role='admin' AND must_change=1 AND status='active' "
+                        "ORDER BY id LIMIT 1").fetchone()
+        if not u:
+            return None
+        token = secrets.token_urlsafe(24)
+        with tx(con):
+            con.execute('DELETE FROM setup_tokens WHERE user_id=? OR expires_at<?', (u['id'], now()))
+            con.execute('INSERT INTO setup_tokens VALUES(?,?,?)', (sha(token), u['id'], now() + SETUP_TTL))
+        return '%s/#/setup/%s' % (base.rstrip('/'), token)
+    finally:
+        con.close()
+
+
+def print_setup_link(base):
+    link = setup_link(base)
+    if link:
+        print('Liên kết đặt mật khẩu lần đầu cho tài khoản giaovien (dùng một lần, hiệu lực 12 giờ):\n  ' + link, flush=True)
+
+
 def lan_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -1737,6 +1795,7 @@ def main():
     ThreadingHTTPServer.daemon_threads = True
     srv = ThreadingHTTPServer((host, a.port), Handler)
     print('TĐH Chemistry đang chạy:  http://localhost:%d' % a.port)
+    print_setup_link('http://localhost:%d' % a.port)
     if a.lan and lan_ip():
         print('Học sinh cùng mạng Wi-Fi truy cập:  http://%s:%d' % (lan_ip(), a.port))
     print('Nhấn Ctrl+C để dừng.')

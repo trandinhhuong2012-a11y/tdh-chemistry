@@ -109,9 +109,28 @@ def run_production(base, tmp):
           and db.execute('SELECT COUNT(*) FROM questions').fetchone()[0] == 0)
     Client(base).call('POST', '/api/login', {'login_id': 'ai-do', 'password': 'x'}, headers={'X-Forwarded-For': '203.0.113.9, 10.0.0.1'})
     check('ghi nhận IP thật của người dùng qua proxy', db.execute("SELECT ip FROM login_failures WHERE login_id='ai-do'").fetchone() == ('203.0.113.9',))
-    db.close()
     st, raw = Client(base).call('GET', '/', raw=True)
     check('trang chủ tải được qua WSGI', st == 200 and 'TĐH Chemistry' in raw)
+
+    print('Liên kết đặt mật khẩu lần đầu')
+    import hashlib
+    check('khi khởi động có tạo liên kết dùng một lần cho quản trị chưa đổi mật khẩu',
+          db.execute('SELECT COUNT(*) FROM setup_tokens').fetchone()[0] == 1)
+    tok = 'ma-thu-' + os.urandom(8).hex()
+    db.execute('INSERT INTO setup_tokens VALUES(?,?,?)', (hashlib.sha256(tok.encode()).hexdigest(), 1, int(time.time()) + 600))
+    db.commit()
+    s = Client(base)
+    check('mã sai bị từ chối', s.call('POST', '/api/setup', {'token': 'sai', 'new': 'Mat-khau-moi-2026'})[0] == 400)
+    check('mật khẩu quá ngắn bị từ chối', s.call('POST', '/api/setup', {'token': tok, 'new': '123'})[0] == 400)
+    st, u = s.call('POST', '/api/setup', {'token': tok, 'new': 'Mat-khau-moi-2026'})
+    check('đặt mật khẩu bằng liên kết: đăng nhập luôn, không còn bắt đổi', st == 200 and u['role'] == 'admin' and not u['must_change'], str(u))
+    sess = (s.headers.get('Set-Cookie') or '').split(';')[0]      # cookie có cờ Secure nên phải tự gửi khi thử qua http
+    check('phiên sau khi đặt mật khẩu dùng được', Client(base).call('GET', '/api/t/classes', headers={'Cookie': sess})[0] == 200)
+    check('liên kết chỉ dùng được một lần', Client(base).call('POST', '/api/setup', {'token': tok, 'new': 'Mat-khau-khac-2026'})[0] == 400)
+    check('mọi liên kết cũ bị huỷ sau khi đặt mật khẩu', db.execute('SELECT COUNT(*) FROM setup_tokens').fetchone()[0] == 0)
+    check('mật khẩu ban đầu hết hiệu lực', Client(base).login('giaovien', PROD_PW)[0] == 401)
+    check('đăng nhập bằng mật khẩu mới', Client(base).login('giaovien', 'Mat-khau-moi-2026')[0] == 200)
+    db.close()
 
 
 def run(base, tmp):

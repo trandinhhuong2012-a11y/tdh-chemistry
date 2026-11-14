@@ -6,9 +6,12 @@
 Cấu hình qua biến môi trường: TDH_DATA (thư mục dữ liệu), TDH_SECURE_COOKIE=1, TDH_TRUST_PROXY=1,
 TDH_NO_DEMO=1, TDH_ADMIN_PASSWORD (mật khẩu ban đầu của tài khoản giaovien), TZ=Asia/Ho_Chi_Minh.
 """
+import os
+
 import server
 
 server.configure()
+server.print_setup_link(os.environ.get('RENDER_EXTERNAL_URL') or os.environ.get('TDH_BASE_URL') or '')
 application = server.wsgi_app
 
 if __name__ == '__main__':                  # chạy thử bằng máy chủ WSGI có sẵn của Python
